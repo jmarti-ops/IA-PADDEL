@@ -1,0 +1,33 @@
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Caches
+.cache/
+.ipynb_checkpoints
+
+# PyInstaller
+*.spec
+
+# Installer logs
+pip-log.txt
+
+# Virtual environment
+venv/
+.env/
+.envrc
+
+# VSCode
+.vscode/
+
+# Streamlit temp
+.mypy_cache/
+.streamlit/
+
+# Output
+*.avi
+*.jpg
+*.pdf
+*.csv
