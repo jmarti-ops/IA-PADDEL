@@ -1,23 +1,35 @@
-# app.py (modo demo sin YOLO)
+# padel_ai_app.py
 import streamlit as st
 import cv2
 import tempfile
 import numpy as np
+import os
 import mediapipe as mp
+from ultralytics import YOLO
 from math import degrees, atan2
 from fpdf import FPDF
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.ndimage import gaussian_filter
 
-st.set_page_config(page_title="Análisis Pádel DEMO", layout="wide")
-st.title("🏓 Demo: Análisis Postural en Pádel (sin detección de objetos)")
+st.set_page_config(page_title="Análisis Pádel IA", layout="wide")
+st.title("🏓 Análisis Inteligente de Pádel con IA")
 
 mp_pose = mp.solutions.pose
 pose = mp_pose.Pose(static_image_mode=True)
 mp_drawing = mp.solutions.drawing_utils
 
 upload = st.file_uploader("Sube una imagen o video .mp4", type=["jpg", "png", "mp4"])
+
+# Cargar modelo YOLO si existe
+model = None
+if os.path.exists("models/yolov8n.pt"):
+    try:
+        model = YOLO("models/yolov8n.pt")
+    except Exception as e:
+        st.warning("❌ Error al cargar YOLO: " + str(e))
+else:
+    st.info("ℹ️ Ejecuta primero descargar_modelo.py para usar YOLO")
 
 
 def calcular_angulo(a, b, c):
@@ -43,11 +55,21 @@ def analizar_pose(frame):
     return frame, kpis, coords
 
 
+def analizar_yolo(frame):
+    if model:
+        results = model.predict(frame, imgsz=640, conf=0.3, verbose=False)
+        boxes = results[0].boxes.xyxy.cpu().numpy()
+        for box in boxes:
+            x1, y1, x2, y2 = map(int, box)
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0,255,0), 2)
+    return frame
+
+
 def generar_pdf(kpis):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=14)
-    pdf.cell(200, 10, "Informe DEMO KPIs Pádel", ln=True, align="C")
+    pdf.cell(200, 10, "Informe KPIs Pádel IA", ln=True, align="C")
     pdf.ln(10)
     for k, v in kpis.items():
         pdf.cell(200, 10, f"{k}: {v:.2f}", ln=True)
@@ -57,17 +79,20 @@ def generar_pdf(kpis):
 
 if upload:
     if upload.name.endswith(".mp4"):
-        cap = cv2.VideoCapture(tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name)
-        cap.open(upload)
+        tfile = tempfile.NamedTemporaryFile(delete=False)
+        tfile.write(upload.read())
+        cap = cv2.VideoCapture(tfile.name)
         stframe = st.empty()
         coords, kpi_series = [], []
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
                 break
+            frame = analizar_yolo(frame)
             frame, kpis, pts = analizar_pose(frame)
             coords.extend(pts)
-            if kpis: kpi_series.append(kpis)
+            if kpis:
+                kpi_series.append(kpis)
             stframe.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), use_column_width=True)
         cap.release()
         if coords:
@@ -84,9 +109,10 @@ if upload:
             st.line_chart(df)
             pdf = generar_pdf(df.mean())
             with open(pdf, "rb") as f:
-                st.download_button("📄 Descargar Informe PDF", f, file_name="demo_kpis.pdf")
+                st.download_button("📄 Descargar Informe PDF", f, file_name="kpis_padel.pdf")
     else:
         img = cv2.imdecode(np.frombuffer(upload.read(), np.uint8), cv2.IMREAD_COLOR)
+        img = analizar_yolo(img)
         frame, kpis, coords = analizar_pose(img)
         st.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), caption="Resultado", use_column_width=True)
         st.write(kpis)
