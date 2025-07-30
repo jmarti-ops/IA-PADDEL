@@ -1,10 +1,13 @@
-streamlit
-opencv-python
-mediapipe
+streamlit>=1.25
+opencv-python-headless>=4.8.0.76
+mediapipe>=0.10.3
 numpy
 pillow
 fpdf
-ultralytics
 matplotlib
 scipy
 pandas
+# YOLO requiere torch y torchvision
+ultralytics>=8.0.20
+torch>=2.0.0
+torchvision>=0.15.0
