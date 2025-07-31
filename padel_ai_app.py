@@ -15,6 +15,7 @@ try:
     import pandas as pd
     import matplotlib.pyplot as plt
     from scipy.ndimage import gaussian_filter
+    import urllib.request
 
     st.set_page_config(page_title="Análisis Pádel IA", layout="wide")
     st.title("🏓 Análisis Inteligente de Pádel con IA")
@@ -25,14 +26,26 @@ try:
 
     upload = st.file_uploader("Sube una imagen o video .mp4", type=["jpg", "png", "mp4"])
 
-    model = None
-    if os.path.exists("models/yolov8n.pt"):
+    # Auto descarga modelo si no está
+    modelo_path = "models/yolov8n.pt"
+    modelo_url = "https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8n.pt"
+    os.makedirs("models", exist_ok=True)
+    if not os.path.exists(modelo_path):
         try:
-            model = YOLO("models/yolov8n.pt")
+            st.info("📥 Descargando modelo YOLOv8n...")
+            urllib.request.urlretrieve(modelo_url, modelo_path)
+            st.success("✅ Modelo YOLO descargado")
+        except Exception as e:
+            st.error("❌ Error al descargar modelo: " + str(e))
+
+    model = None
+    if os.path.exists(modelo_path):
+        try:
+            model = YOLO(modelo_path)
         except Exception as e:
             st.warning("❌ Error al cargar YOLO: " + str(e))
     else:
-        st.info("ℹ️ Ejecuta primero descargar_modelo.py para usar YOLO")
+        st.warning("⚠️ Modelo YOLO no encontrado")
 
     def calcular_angulo(a, b, c):
         ang = degrees(atan2(c[1]-b[1], c[0]-b[0]) - atan2(a[1]-b[1], a[0]-b[0]))
