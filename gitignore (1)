@@ -1,0 +1,6 @@
+__pycache__/
+models/
+*.pdf
+*.mp4
+*.avi
+.DS_Store
