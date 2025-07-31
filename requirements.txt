@@ -1,8 +1,9 @@
-streamlit
+streamlit>=1.25.0
 opencv-python-headless
 pandas
 matplotlib
 scipy
 fpdf
-ultralytics
+ultralytics>=8.0.0
 mediapipe
+
