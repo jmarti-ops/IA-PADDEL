@@ -16,6 +16,7 @@ try:
     import matplotlib.pyplot as plt
     from scipy.ndimage import gaussian_filter
     import urllib.request
+    from inference_sdk import InferenceHTTPClient
 
     st.set_page_config(page_title="Análisis Pádel IA", layout="wide")
     st.title("🏓 Análisis Inteligente de Pádel con IA")
@@ -26,7 +27,6 @@ try:
 
     upload = st.file_uploader("Sube una imagen o video .mp4", type=["jpg", "png", "mp4"])
 
-    # Auto descarga modelo si no está
     modelo_path = "models/yolov8n.pt"
     modelo_url = "https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8n.pt"
     os.makedirs("models", exist_ok=True)
@@ -39,13 +39,16 @@ try:
             st.error("❌ Error al descargar modelo: " + str(e))
 
     model = None
-    if os.path.exists(modelo_path):
-        try:
+    try:
+        if os.path.exists(modelo_path):
             model = YOLO(modelo_path)
-        except Exception as e:
-            st.warning("❌ Error al cargar YOLO: " + str(e))
-    else:
-        st.warning("⚠️ Modelo YOLO no encontrado")
+    except Exception as e:
+        st.warning("❌ Error al cargar YOLO local: " + str(e))
+
+    roboflow_client = InferenceHTTPClient(
+        api_url="https://serverless.roboflow.com",
+        api_key="YOUR_API_KEY"
+    )
 
     def calcular_angulo(a, b, c):
         ang = degrees(atan2(c[1]-b[1], c[0]-b[0]) - atan2(a[1]-b[1], a[0]-b[0]))
@@ -69,12 +72,26 @@ try:
         return frame, kpis, coords
 
     def analizar_yolo(frame):
-        if model:
-            results = model.predict(frame, imgsz=640, conf=0.3, verbose=False)
-            boxes = results[0].boxes.xyxy.cpu().numpy()
-            for box in boxes:
-                x1, y1, x2, y2 = map(int, box)
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (0,255,0), 2)
+        try:
+            if model:
+                results = model.predict(frame, imgsz=640, conf=0.3, verbose=False)
+                boxes = results[0].boxes.xyxy.cpu().numpy()
+                for box in boxes:
+                    x1, y1, x2, y2 = map(int, box)
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0,255,0), 2)
+            else:
+                cv2.imwrite("temp.jpg", frame)
+                result = roboflow_client.run_workflow(
+                    workspace_name="aixpointpro",
+                    workflow_id="custom-workflow",
+                    images={"image": "temp.jpg"},
+                    use_cache=True
+                )
+                for pred in result.get("predictions", []):
+                    x, y, w, h = int(pred['x']), int(pred['y']), int(pred['width']//2), int(pred['height']//2)
+                    cv2.rectangle(frame, (x-w, y-h), (x+w, y+h), (255,0,0), 2)
+        except Exception as e:
+            st.warning(f"⚠️ Error usando YOLO/Roboflow: {e}")
         return frame
 
     def generar_pdf(kpis):
